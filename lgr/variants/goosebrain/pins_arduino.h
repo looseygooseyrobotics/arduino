@@ -2,7 +2,7 @@
 
 // goosebrain (rev 2): RP2354A, 2 MB flash.
 //
-// Only the six IO ports on J5 (IO1-IO6 = GPIO0, 1, 2, 3, 8, 9) are free for
+// Only the six S ports on J5 (S1-S6 = GPIO0, 1, 2, 3, 8, 9) are free for
 // sketches; the other GPIOs drive the motors, the LED stick, the battery
 // sense and the USB-A host. There's no LED_BUILTIN: GPIO25, the Pico's LED,
 // is the USB-A port's D+ here, and driving it high without a pack
@@ -18,13 +18,13 @@
 #define NUM_ANALOG_OUTPUTS  (0u)
 #define ADC_RESOLUTION      (12u)
 
-// Serial1 on IO1/IO2, Serial2 on IO5/IO6
+// Serial1 on S1/S2, Serial2 on S5/S6
 #define PIN_SERIAL1_TX (0u)
 #define PIN_SERIAL1_RX (1u)
 #define PIN_SERIAL2_TX (8u)
 #define PIN_SERIAL2_RX (9u)
 
-// SPI on IO1-IO4. SPI1 has no free SCK/MOSI pins; it's here because the core
+// SPI on S1-S4. SPI1 has no free SCK/MOSI pins; it's here because the core
 // expects two.
 #define PIN_SPI0_MISO  (0u)
 #define PIN_SPI0_SS    (1u)
@@ -35,7 +35,7 @@
 #define PIN_SPI1_SCK   (10u)
 #define PIN_SPI1_MOSI  (11u)
 
-// Wire on IO1/IO2, Wire1 on IO3/IO4
+// Wire on S1/S2, Wire1 on S3/S4
 #define PIN_WIRE0_SDA  (0u)
 #define PIN_WIRE0_SCL  (1u)
 #define PIN_WIRE1_SDA  (2u)

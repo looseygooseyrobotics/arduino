@@ -1,6 +1,6 @@
-// A lift on M5 with an encoder on IO2. Up and down on the d-pad step it
+// A lift on M5 with an encoder on S2. Up and down on the d-pad step it
 // through a list of heights, and a task in the background drives the motor
-// to hold whichever height is chosen. A claw servo on IO1 opens and closes
+// to hold whichever height is chosen. A claw servo on S1 opens and closes
 // with each press of A. The drive is on M1 and M2, as in ArcadeDrive.
 
 #include <lgr.h>
@@ -8,8 +8,8 @@
 Motor left(M1);
 Motor right(M2, REVERSED);
 Motor lift(M5);
-Encoder liftEncoder(IO2);
-ServoMotor claw(IO1, 1000, 2000, 1000);
+Encoder liftEncoder(S2);
+ServoMotor claw(S1, 1000, 2000, 1000);
 
 // lift heights, in degrees of the encoder from where the lift was at power-on
 const float liftHeights[] = {0, 400, 900};

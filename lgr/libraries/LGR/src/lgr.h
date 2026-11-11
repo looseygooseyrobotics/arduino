@@ -9,7 +9,7 @@
 //
 //   Motor left(M3);
 //   Motor right(M4, REVERSED);
-//   ServoMotor claw(IO1, 1000, 2000);
+//   ServoMotor claw(S1, 1000, 2000);
 //
 //   void setup() {}
 //
@@ -66,13 +66,13 @@ constexpr MotorPort M4 = {16, 17};
 constexpr MotorPort M5 = {12, 13};
 constexpr MotorPort M6 = {14, 15};
 
-// IO ports on J5, for servos or encoders
-constexpr int IO1 = 0;
-constexpr int IO2 = 1;
-constexpr int IO3 = 2;
-constexpr int IO4 = 3;
-constexpr int IO5 = 8;
-constexpr int IO6 = 9;
+// S ports on J5, for servos or encoders
+constexpr int S1 = 0;
+constexpr int S2 = 1;
+constexpr int S3 = 2;
+constexpr int S4 = 3;
+constexpr int S5 = 8;
+constexpr int S6 = 9;
 
 constexpr bool REVERSED = true;
 
@@ -104,7 +104,7 @@ class ServoMotor {
     volatile bool _attached = false;
 };
 
-// An AS5600 in PWM output mode on an IO port. Counts past one turn in either
+// An AS5600 in PWM output mode on an S port. Counts past one turn in either
 // direction, from when the program starts or reset() was last called.
 class Encoder {
   public:

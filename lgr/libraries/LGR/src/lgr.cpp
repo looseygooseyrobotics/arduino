@@ -134,7 +134,7 @@ ServoMotor::ServoMotor(int port, int minPulse, int maxPulse, int start) : _port(
 }
 
 void ServoMotor::begin() {
-  // the pulses come from PIO, so any IO port works
+  // the pulses come from PIO, so any S port works
   _servo.attach(_port, _min, _max, _position);
   _attached = true;
 }

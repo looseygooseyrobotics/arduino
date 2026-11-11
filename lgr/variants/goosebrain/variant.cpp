@@ -4,10 +4,9 @@
 #include "RP2040Version.h"
 #include "hardware/structs/powman.h"
 
-// platform.txt is the core's, so the board package only builds with the core
-// version it was made from (tools/arduino_package.py).
-#if ARDUINO_PICO_MAJOR != 6 || ARDUINO_PICO_MINOR != 3
-#error "goosebrain needs version 6.3.x of the Raspberry Pi Pico/RP2040/RP2350 boards (Tools > Board > Boards Manager)"
+// The oldest Pico core the package has been built with. Newer ones should work.
+#if ARDUINO_PICO_MAJOR < 5 || (ARDUINO_PICO_MAJOR == 5 && ARDUINO_PICO_MINOR < 7)
+#error "goosebrain needs version 5.7.0 or newer of the Raspberry Pi Pico/RP2040/RP2350 boards (Tools > Board > Boards Manager)"
 #endif
 
 // The lgr library's startup, if the sketch uses it

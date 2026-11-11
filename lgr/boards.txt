@@ -4,8 +4,8 @@
 #
 # Built from the core's generic_rp2350 entry with these options: RP2350A,
 # 2MB (no FS), 120 MHz (PIO USB needs a multiple of 12 MHz), Adafruit TinyUSB,
-# ARM, no PSRAM, FreeRTOS SMP, -Os, no RTTI or exceptions, UF2 upload. platform.txt holds
-# the core's own recipes; see tools/arduino_package.py.
+# ARM, no PSRAM, FreeRTOS SMP, -Os, no RTTI or exceptions, UF2 upload. The build
+# recipes are the installed core's own (lgr/platform.txt only sets the name).
 
 goosebrain.name=goosebrain
 goosebrain.vid.0=0x2e8a
@@ -18,6 +18,8 @@ goosebrain.upload_port.1.vid=0x2e8a
 goosebrain.upload_port.1.pid=0xf10f
 
 goosebrain.build.core=rp2040:rp2040
+# run the inherited recipes from the core's folder, where their scripts and files are
+goosebrain.runtime.use_core_platform_path_for_runtime_platform_path=true
 goosebrain.build.variant=goosebrain
 goosebrain.build.board=GOOSEBRAIN
 goosebrain.build.usbvid=-DUSBD_VID=0x2e8a
