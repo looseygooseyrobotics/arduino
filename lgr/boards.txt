@@ -1,0 +1,84 @@
+# Loosey Goosey Robotics boards. They borrow the Raspberry Pi Pico core
+# (earlephilhower/arduino-pico) for the compiler, core and upload tools, with
+# every Tools option fixed, so there's nothing to set.
+#
+# Built from the core's generic_rp2350 entry with these options: RP2350A,
+# 2MB (no FS), 120 MHz (PIO USB needs a multiple of 12 MHz), Adafruit TinyUSB,
+# ARM, no PSRAM, FreeRTOS SMP, -Os, no RTTI or exceptions, UF2 upload. platform.txt holds
+# the core's own recipes; see tools/arduino_package.py.
+
+goosebrain.name=goosebrain
+goosebrain.vid.0=0x2e8a
+goosebrain.pid.0=0xf00f
+goosebrain.vid.1=0x2e8a
+goosebrain.pid.1=0xf10f
+goosebrain.upload_port.0.vid=0x2e8a
+goosebrain.upload_port.0.pid=0xf00f
+goosebrain.upload_port.1.vid=0x2e8a
+goosebrain.upload_port.1.pid=0xf10f
+
+goosebrain.build.core=rp2040:rp2040
+goosebrain.build.variant=goosebrain
+goosebrain.build.board=GOOSEBRAIN
+goosebrain.build.usbvid=-DUSBD_VID=0x2e8a
+goosebrain.build.usbpid=-DUSBD_PID=0xf00f
+goosebrain.build.usbpwr=-DUSBD_MAX_POWER_MA=250
+goosebrain.build.usb_manufacturer="Loosey Goosey Robotics"
+goosebrain.build.usb_product="goosebrain"
+goosebrain.build.led=
+goosebrain.build.ldscript=memmap_default.ld
+goosebrain.build.boot2=none
+goosebrain.serial.disableDTR=false
+goosebrain.serial.disableRTS=false
+
+# chip: RP2350A, ARM cores
+goosebrain.build.chip=rp2350
+goosebrain.build.mcu=cortex-m33
+goosebrain.build.toolchain=arm-none-eabi
+goosebrain.build.toolchainpkg=pqt-gcc
+goosebrain.build.toolchainopts=-mcpu=cortex-m33 -mthumb -march=armv8-m.main+fp+dsp -mfloat-abi=softfp -mcmse
+goosebrain.build.uf2family=--family rp2350-arm-s --abs-block
+goosebrain.build.variantdefines=-D__PICO_RP2350A=1
+
+# flash: 2 MB, no file system
+goosebrain.upload.maximum_size=2088960
+goosebrain.build.flash_total=2097152
+goosebrain.build.flash_length=2088960
+goosebrain.build.eeprom_start=270524416
+goosebrain.build.fs_start=270524416
+goosebrain.build.fs_end=270524416
+
+# RAM, no PSRAM
+goosebrain.build.ram_length=512k
+goosebrain.upload.maximum_data_size=524288
+goosebrain.build.psram_cs=
+goosebrain.build.psram_length=0x000000
+goosebrain.build.psram_freq=-DRP2350_PSRAM_MAX_SCK_HZ=104000000
+
+# 120 MHz, for PIO USB
+goosebrain.build.f_cpu=120000000L
+
+# USB: Adafruit TinyUSB, so the USB-A host and the USB-C serial port both work
+goosebrain.build.usbstack_flags=-DUSE_TINYUSB "-I{build.core.platform.path}/libraries/Adafruit_TinyUSB_Arduino/src/arduino"
+
+# compiler options: the core's defaults, but with FreeRTOS, which the LGR
+# library's Task runs on
+goosebrain.build.flags.optimize=-Os
+goosebrain.build.os=-D__FREERTOS
+goosebrain.build.flags.profile=
+goosebrain.build.flags.rtti=-fno-rtti
+goosebrain.build.flags.stackprotect=
+goosebrain.build.flags.exceptions=-fno-exceptions
+goosebrain.build.flags.libstdcpp=-lstdc++
+goosebrain.build.debug_port=
+goosebrain.build.debug_level=
+goosebrain.build.libpicow=liblwip.a
+goosebrain.build.libpicowdefs=-DLWIP_IPV6=0 -DLWIP_IPV4=1
+
+# upload: drag the UF2 onto the BOOTSEL drive, which the core's tool does
+goosebrain.upload.tool=uf2conv
+goosebrain.upload.tool.default=uf2conv
+goosebrain.upload.tool.network=uf2conv-network
+goosebrain.upload.wait_for_upload_port=true
+goosebrain.upload.erase_cmd=
+goosebrain.build.debugscript=picoprobe_cmsis_dap.tcl
