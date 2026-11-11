@@ -2,7 +2,7 @@
 
     python tools/arduino_package.py platform   # regenerate lgr/platform.txt from the installed Pico core
     python tools/arduino_package.py install    # copy the package into the sketchbook, to try it without a release
-    python tools/arduino_package.py release    # write lgr-rp2040-<version>.zip and package_lgr_index.json into site/
+    python tools/arduino_package.py release    # write lgr-rp2040-<version>.zip and package_lgr_index.json into releases/
 
 The package borrows the Raspberry Pi Pico core (earlephilhower/arduino-pico) through `build.core=rp2040:rp2040`. When a
 board borrows a core, arduino-cli uses the core's platform.txt but sets {runtime.platform.path} to this package, so
@@ -15,10 +15,9 @@ the sketchbook's libraries folder at the versions in BUNDLED. TinyUSB comes with
 package and the core's own entry with its tools, so users add one Boards Manager URL, then install "Raspberry Pi
 Pico/RP2040/RP2350" and "Loosey Goosey Robotics".
 
-The index and the zips are served from https://arduino.looseygooseyrobotics.com by GitHub Pages, from this
-repository's gh-pages branch. site/ is that branch checked out as a worktree (`git worktree add site gh-pages`). To
-publish a release: bump VERSION, run `release`, then commit and push site/. The index keeps every earlier version, so a
-release never removes one.
+The index and the zips in releases/ are served from https://arduino.looseygooseyrobotics.com by GitHub Pages:
+.github/workflows/pages.yml publishes the folder on every push to main that changes it. To publish a release: bump
+VERSION, run `release`, then commit and push. The index keeps every earlier version, so a release never removes one.
 """
 import argparse
 import hashlib
@@ -32,7 +31,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "lgr"
-SITE = ROOT / "site"
+RELEASES = ROOT / "releases"
 BUILD = ROOT / "build"
 
 VERSION = "0.1.0"
@@ -88,10 +87,10 @@ def install():
     print(f"installed in {dest}; restart the IDE and pick Tools > Board > Loosey Goosey Robotics > goosebrain")
 
 
-def release(site):
+def release(out):
     name = f"lgr-rp2040-{VERSION}.zip"
-    archive = site / name
-    index_path = site / "package_lgr_index.json"
+    archive = out / name
+    index_path = out / "package_lgr_index.json"
     if archive.exists():
         sys.exit(f"{archive} is already published; bump VERSION")
     previous = []
@@ -143,12 +142,11 @@ def release(site):
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("step", choices=["platform", "install", "release"])
-    ap.add_argument("--site", type=Path, default=SITE, help="release: where to write (default site/, the gh-pages worktree)")
+    ap.add_argument("--out", type=Path, default=RELEASES, help="release: where to write (default releases/)")
     args = ap.parse_args()
     if args.step == "release":
-        if not args.site.is_dir():
-            ap.error(f"{args.site} doesn't exist; run `git worktree add site gh-pages` first")
-        release(args.site)
+        args.out.mkdir(parents=True, exist_ok=True)
+        release(args.out)
     else:
         {"platform": platform, "install": install}[args.step]()
 
