@@ -1,5 +1,5 @@
 #include <Arduino.h>
-#include "pio_usb.h" // before lgr.h, or the build misses the Pico PIO USB library
+#include "pio_usb.h"
 #include "lgr.h"
 
 #include "Adafruit_TinyUSB.h"
@@ -10,42 +10,25 @@
 #error "Set Tools > Board to goosebrain (from the Loosey Goosey Robotics boards)"
 #endif
 
-#include <FreeRTOS.h> // the goosebrain board builds with the core's FreeRTOS, for Task
+#include <FreeRTOS.h>
 #include <task.h>
 
-// Startup
-//
-// Core0: global constructors register each part, then lgrBegin(), which the
-// goosebrain variant's initVariant() calls before setup(), sets up the
-// motors and encoders. Core1: setup1() starts the USB host first, because it needs fixed
-// PIO state machines (PIO0 SM0, PIO1 SM0/1) and DMA channel 0, then the LED
-// stick and the servos take what's left. loop1() runs the USB host, the
-// battery check and the status LEDs.
-//
-// The board builds with the core's FreeRTOS, which runs setup()/loop() as a
-// thread on core0 and setup1()/loop1() as one on core1. Each Task is one more
-// thread on core0, at loop()'s priority, so the two share core0 a millisecond
-// at a time when both are busy, and nothing but loop1() runs on core1.
-//
-// Parts made after startup (as locals, say) set themselves up when they're
-// made.
-
-#define LED_PIN 29     // LED stick data (through U14 to J12)
+#define LED_PIN 29
 #define LED_COUNT 8
 #define LED_BRIGHTNESS 40
 #define VSYS_PIN 28    // battery sense, VSYS / 4.7
-#define USB_HOST_DP 25 // USB-A D+; D- is GPIO24, below it (PIO_USB_PINOUT_DMDP)
+#define USB_HOST_DP 25 // USB-A D+; D- is GPIO24
 
-#define PACK_MIN 5.0   // below this there's no pack (or the switch is off)
-#define CELL_LOW 3.3   // too dead to drive: well above the packs' 2.8 V cutoff
+#define PACK_MIN 5.0
+#define CELL_LOW 3.3   // dead battery cutoff
 #define CELL_WARN 3.5  // the battery bar turns red below this
 #define CELL_FULL 4.2
 #define ENCODER_TIMEOUT 50000 // us without a rising edge: no encoder
 #define STICK_DEAD_ZONE 8     // percent
 #define TRIGGER_PRESS 64      // l2()/r2() press past this (of 255)
-#define MAX_PARTS 6           // of each kind
+#define MAX_PARTS 6
 #define MAX_TASKS 8
-#define TASK_STACK 2048       // words (8 KB): room for printf with floats
+#define TASK_STACK 2048
 
 Adafruit_NeoPixel leds(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
 volatile bool statusLeds = true;
@@ -57,16 +40,16 @@ static Encoder *encoders[MAX_PARTS];
 static Task *tasks[MAX_TASKS];
 static int motorCount, servoCount, encoderCount, taskCount;
 
-static bool started = false;            // core0 setup done; parts start when made
-static volatile bool servosReady = false; // core1 setup done; servos attach when made
-static critical_section_t lock;          // the controller state and the servo list
+static bool started = false;
+static volatile bool servosReady = false;
+static critical_section_t lock;
 
 // Motor
 
 Motor::Motor(MotorPort port, bool reversed) : _port(port), _reversed(reversed) {
   if (started) {
     begin();
-  } else if (motorCount < MAX_PARTS) {
+  } else {
     motors[motorCount++] = this;
   }
 }
@@ -151,12 +134,6 @@ int ServoMotor::position() {
 }
 
 // Encoder
-//
-// The AS5600's PWM frame is 4351 clocks: 128 high, then the angle (0-4095
-// clocks high), then the rest low, at any of its frequencies (115-920 Hz).
-// The angle comes from the ratio of the high time to the period, and each
-// frame is unwrapped against the last one: the shorter way round is the real
-// one, which holds up to about 57 rev/s at 115 Hz.
 
 static void encoderEdge(void *param) {
   ((Encoder *) param)->onEdge();
@@ -172,7 +149,7 @@ Encoder::Encoder(int port, bool reversed) : _port(port), _reversed(reversed) {
 
 void Encoder::begin() {
   _rise = time_us_32();
-  pinMode(_port, INPUT_PULLDOWN); // an empty port reads low, not noise
+  pinMode(_port, INPUT_PULLDOWN);
   attachInterruptParam(_port, encoderEdge, CHANGE, this);
 }
 
@@ -202,7 +179,17 @@ void Encoder::onEdge() {
     } else if (delta < -2048) {
       delta += 4096;
     }
-    _total += _reversed ? -delta : delta;
+    if (_reversed) {
+      delta = -delta;
+    }
+    _total += delta;
+
+    // Smoothing: an exponential average with a time constant of _smoothUs,
+    // stepped by each frame's period so it's the same at any AS5600
+    // frequency. It's kept as how far it lags _total, which stays small, so
+    // it loses no precision however many turns the total runs to.
+    float smooth = _smoothUs;
+    _lag = (_lag - delta) * (smooth / (smooth + period));
   }
   _raw = raw;
 }
@@ -211,12 +198,25 @@ bool Encoder::connected() {
   return _raw >= 0 && time_us_32() - _rise < ENCODER_TIMEOUT;
 }
 
+float Encoder::total() {
+  // both from the same frame
+  uint32_t irq = save_and_disable_interrupts();
+  long total = _total;
+  float lag = _lag;
+  restore_interrupts(irq);
+  return total + lag;
+}
+
 float Encoder::angle() {
-  return _total * 360.0 / 4096;
+  return total() * 360.0 / 4096;
 }
 
 float Encoder::turns() {
-  return _total / 4096.0;
+  return total() / 4096.0;
+}
+
+void Encoder::smoothing(int ms) {
+  _smoothUs = max(ms, 0) * 1000.0f;
 }
 
 float Encoder::position() {
@@ -231,12 +231,13 @@ float Encoder::position() {
 }
 
 void Encoder::reset() {
+  uint32_t irq = save_and_disable_interrupts();
   _total = 0;
+  _lag = 0;
+  restore_interrupts(irq);
 }
 
 // Task
-//
-// A FreeRTOS thread on core0 that calls the function at a steady rate.
 
 static void taskThread(void *param) {
   ((Task *) param)->run();
@@ -272,11 +273,6 @@ void Task::run() {
 }
 
 // Controller
-//
-// A gamepad on the USB-A port. The USB host runs on core1 and puts each
-// report in `pad`, which the Controller methods read on core0. Only XInput
-// (Xbox 360 style) pads work, through the small driver below, and only one at
-// a time: the first one plugged in.
 
 enum {
   BTN_A = 1 << 0, BTN_B = 1 << 1, BTN_X = 1 << 2, BTN_Y = 1 << 3,
@@ -292,11 +288,10 @@ struct PadState {
   uint8_t lt, rt;         // 0-255
 };
 
-// written on core1, read on core0
 static PadState pad;
 static bool padConnected = false;
-static bool padReported = false; // the pad has sent a report since it was plugged in (core1)
-static uint32_t padPressed = 0; // BTN_* pressed since each was last read by a ...Pressed()
+static bool padReported = false;
+static uint32_t padPressed = 0;
 
 static Adafruit_USBH_Host USBHost;
 
@@ -328,11 +323,9 @@ static void setPadReport(PadState &s) {
 }
 
 //--------------------------------------------------------------------+
-// XInput class driver. TinyUSB has none, so this is a minimal one: one pad,
-// read only, plus the player 1 LED command.
+// XInput class driver
 //--------------------------------------------------------------------+
 
-// XInput button bits 0-15
 static const uint32_t XINPUT_BUTTONS[16] = {
   BTN_UP, BTN_DOWN, BTN_LEFT, BTN_RIGHT, BTN_START, BTN_SELECT, BTN_L3, BTN_R3,
   BTN_L1, BTN_R1, BTN_HOME, 0, BTN_A, BTN_B, BTN_X, BTN_Y,
@@ -367,13 +360,11 @@ static bool xinputDeinit() {
 
 static uint16_t xinputOpen(uint8_t rhport, uint8_t daddr, tusb_desc_interface_t const *itf, uint16_t maxLen) {
   (void) rhport;
-  // vendor class, subclass 0x5D, protocol 1: a wired 360 pad's input interface
   if (xin.mounted || itf->bInterfaceClass != 0xFF || itf->bInterfaceSubClass != 0x5D ||
       itf->bInterfaceProtocol != 0x01) {
     return 0;
   }
 
-  // claim everything up to the next interface: the vendor descriptor and both endpoints
   uint8_t const *p = (uint8_t const *) itf;
   uint8_t const *end = p + maxLen;
   uint16_t len = tu_desc_len(p);
@@ -469,7 +460,6 @@ extern "C" const usbh_class_driver_t *usbh_app_driver_get_cb(uint8_t *count) {
   return &xinputDriver;
 }
 
-// a device plugged in that isn't a controller this reads; 0 if none (core1)
 static uint8_t strangerAddr = 0;
 
 extern "C" void tuh_mount_cb(uint8_t daddr) {
@@ -591,7 +581,7 @@ void Controller::print() {
 // Battery (core1)
 
 static volatile float vsys = 0; // filtered battery voltage
-static volatile int cells = 0;  // 0 until a pack is seen
+static volatile int cells = 0;
 static uint32_t packSeen = 0;   // millis() when the pack was first seen, for the startup sweep
 
 static float readVsys() {
@@ -610,20 +600,15 @@ bool batteryLow() {
   return cells > 0 && vsys >= PACK_MIN && vsys < CELL_LOW * cells;
 }
 
-// Every 10 ms. Filtered, so a motor's current spike doesn't read as a flat pack.
 static void updateBattery() {
   static bool warned = false;
-  static bool rising = false; // VSYS is up, and the cell count waits for it to settle
+  static bool rising = false;
   static uint32_t risingSince = 0;
 
   // unfiltered until the cell count is in, so it follows VSYS up at switch-on
   float v = readVsys();
   vsys = (cells == 0 || vsys < PACK_MIN || v < PACK_MIN) ? v : vsys + (v - vsys) * 0.05;
 
-  // the cell count, once VSYS has been up for 200 ms: above 8.6 V it's 3S.
-  // VSYS takes a moment to rise at switch-on, and a reading on the way up
-  // would count a 3S pack as 2S. Only a nearly flat 3S pack reads as 2S, and
-  // the cutoff is in hardware.
   if (cells == 0) {
     if (v < PACK_MIN) {
       rising = false;
@@ -643,26 +628,8 @@ static void updateBattery() {
   }
 }
 
-// Status LEDs (core1), every 50 ms. After the startup sweep, the battery shows
-// as a bar from LED 0 (the one nearest J12) whenever a pack is on, so it drains
-// back toward LED 0. LED 7 blinks the status, if there is one; with a full
-// battery it alternates between the status and green instead.
-//   white sweep, then 2 or 3 white   startup: the pack is 2S or 3S
-//   green bar                        the battery level
-//   red bar                          battery low (under 3.5 V per cell)
-//   blinking red bar                 too dead to drive (under 3.3 V per cell)
-// The status on LED 7, first match wins:
-//   blinking purple                  no pack: running on USB-C power alone (no bar)
-//   blinking amber                   something on USB-A, but no controller to read:
-//                                    a dongle with its pad off or unpaired, or a
-//                                    dongle or pad in the wrong (non-XInput) mode
-//   blinking blue                    nothing on USB-A
-//   none                             controller connected
-//
-// Some dongles show up as a device this can't read until their pad connects,
-// and others as an XInput pad that hasn't reported yet: both are amber. XInput
-// pads only report when something changes, so a pad switched off later can't
-// be told from one lying still: the status stays clear until the dongle unplugs.
+// Status LEDs
+
 static void updateLeds() {
   uint32_t now = millis();
   bool blink = (now / 250) % 2;
@@ -681,7 +648,6 @@ static void updateLeds() {
     return;
   }
 
-  // the battery bar, from LED 0: at least one LED while a pack is on
   int n = 0;
   if (cells > 0 && vsys >= PACK_MIN) {
     float perCell = vsys / cells;
@@ -696,10 +662,9 @@ static void updateLeds() {
     }
   }
 
-  // the status, on LED 7
+  // the status
   uint32_t status = 0;
   if (vsys < PACK_MIN) {
-    // USB-C alone: U8 feeds both the MCU and the stick, 150 mA in all
     status = leds.Color(160, 0, 255);
   } else if (strangerAddr || (controller.connected() && !padReported)) {
     status = leds.Color(255, 100, 0);
@@ -720,12 +685,10 @@ static void updateLeds() {
 
 // Startup
 
-// Called on core0 before setup() (and before core1 starts), by the goosebrain
-// variant's initVariant(). FreeRTOS is running by then, so the tasks can start.
 void lgrBegin() {
   critical_section_init(&lock);
 
-  analogWriteFreq(20000); // above hearing, and short off times for the drivers
+  analogWriteFreq(20000);
   analogWriteRange(255);
   for (int i = 0; i < motorCount; i++) {
     motors[i]->begin();
@@ -739,11 +702,8 @@ void lgrBegin() {
   started = true;
 }
 
-// Core1: the USB host, then the parts that use PIO.
-//
-// The host starts at boot, with or without a pack. Pico-PIO-USB leaves D+/D-
-// as inputs with pull-downs until a device pulls D+ up, and the dongle can't
-// without VCC, so nothing back-powers VCC through U11.
+// Core1: the USB host and PIO.
+
 void setup1() {
   pio_usb_configuration_t cfg = PIO_USB_DEFAULT_CONFIG;
   cfg.pin_dp = USB_HOST_DP;
@@ -766,7 +726,7 @@ void setup1() {
   analogReadResolution(12);
   vsys = readVsys();
   if (vsys < PACK_MIN) {
-    Serial.println("No pack: motors, servos and the controller have no power (the LEDs run from USB)");
+    Serial.println("No battery detected");
   }
 }
 
