@@ -1,7 +1,4 @@
-# Loosey Goosey Robotics Arduino boards
-
-Arduino support for the goosebrain: a **goosebrain** board with every Tools option already set, and the **LGR**
-library for motors, servos, encoders, the USB controller, the battery and the status LEDs.
+# Goosebrain with Arduino
 
 ## Install (Arduino IDE)
 
