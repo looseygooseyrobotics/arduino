@@ -42,13 +42,6 @@ void loop() {
 }
 ```
 
-More in **File > Examples > LGR**: **ArcadeDrive** and **LiftPositions**.
-
-## Upload
-
-Plug the goosebrain in over USB-C and click **Upload**. The first time, or if the board stops showing a serial port:
-switch the board off, hold **BOOT** while plugging in USB-C, then upload. It shows up as a drive, and the upload finds it.
-
 ## arduino-cli
 
 ```
