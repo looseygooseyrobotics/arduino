@@ -1,7 +1,4 @@
-# Loosey Goosey Robotics Arduino boards
-
-Arduino support for the goosebrain: a **goosebrain** board with every Tools option already set, and the **LGR**
-library for motors, servos, encoders, the USB controller, the battery and the status LEDs.
+# Goosebrain with Arduino
 
 ## Install (Arduino IDE)
 
@@ -44,13 +41,6 @@ void loop() {
     delay(10);
 }
 ```
-
-More in **File > Examples > LGR**: **ArcadeDrive** and **LiftPositions**.
-
-## Upload
-
-Plug the goosebrain in over USB-C and click **Upload**. The first time, or if the board stops showing a serial port:
-switch the board off, hold **BOOT** while plugging in USB-C, then upload. It shows up as a drive, and the upload finds it.
 
 ## arduino-cli
 
